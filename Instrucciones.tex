@@ -1,0 +1,1555 @@
+\documentclass[11pt,letterpaper]{amsart}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\geometry{margin=1in}
+
+\newcommand{\R}{\mathbb R}
+\newcommand{\Len}{\mathrm{Len}}
+\newcommand{\Roll}{\mathrm{Roll}}
+\DeclareMathOperator{\Ker}{ker}
+\DeclareMathOperator{\rank}{rank}
+
+\newenvironment{checkpoint}
+{\par\medskip\noindent\begin{quote}\textbf{Checkpoint.}\ }
+{\end{quote}\par\medskip}
+
+\newenvironment{warningbox}
+{\par\medskip\noindent\begin{quote}\textbf{Advertencia.}\ }
+{\end{quote}\par\medskip}
+
+\newenvironment{taskbox}
+{\par\medskip\noindent\begin{quote}\textbf{Tarea.}\ }
+{\end{quote}\par\medskip}
+
+\newenvironment{microbox}
+{\par\medskip\noindent\begin{quote}\textbf{Micro-modulo.}\ }
+{\end{quote}\par\medskip}
+
+\title{Plan de desarrollo de \texttt{csdraw}\\
+Software para medir longitud de diagramas cs de nudos}
+\author{Guia concreta para Tomas}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Objetivo del software}
+
+El objetivo es construir software para medir, dibujar y luego optimizar la
+longitud de diagramas cs de nudos.
+
+La primera version debe tener dos tests obligatorios, en este orden:
+\[
+\boxed{
+1.\ \texttt{stadium\_2.json}
+}
+\qquad
+\boxed{
+2.\ \texttt{figure8\_4\_1\_manual.json}
+}
+\]
+
+El primer test, \texttt{stadium\_2.json}, no es un nudo. Es el test geometrico
+minimo del motor cs. Verifica puntos, longitud, SVG, contactos, rolling,
+kernel, gradiente reducido y descenso.
+
+El segundo test, \texttt{figure8\_4\_1\_manual.json}, es el primer test real de
+diagrama de nudo. Debe construirse a partir de un diagrama conocido del nudo
+figura ocho \(4_1\), usando una componente declarada y cuatro cruces over/under
+declarados manualmente.
+
+\begin{warningbox}
+No debemos confundir a Tomas. Primero se prueba el motor cs con
+\texttt{stadium\_2.json}. Solo despues se prueba el diagrama de nudo
+\texttt{figure8\_4\_1\_manual.json}. No usamos gauge. No usamos variables
+\(\omega_\alpha\). No usamos \(L(c)\). No usamos codigo de Gauss en la primera
+version.
+\end{warningbox}
+
+\begin{warningbox}
+En la primera version, \(4_1\) se usa para validar estructura de diagrama de
+nudo, no para certificar estacionariedad ni descenso. Los modulos
+\texttt{rolling.py}, \texttt{reduced.py} y \texttt{descent.py} se testean
+primero solamente con \texttt{stadium\_2.json}.
+\end{warningbox}
+
+\section{Regla principal de trabajo}
+
+Cada paso debe producir codigo ejecutable y una salida verificable.
+
+Formato obligatorio de reporte:
+\begin{verbatim}
+Modulo:
+Archivo:
+Funcion:
+Comando:
+Salida esperada:
+Salida obtenida:
+Estado: OK / ERROR
+\end{verbatim}
+
+Si el estado es \texttt{ERROR}, no se avanza.
+
+\begin{warningbox}
+No se debe avanzar al siguiente modulo si el modulo actual no produce la salida
+esperada. La meta no es escribir mucho codigo. La meta es mantener una cadena de
+pasos verificados.
+\end{warningbox}
+
+\section{Tolerancia numerica}
+
+En todos los tests numericos usamos:
+\[
+\varepsilon_{\rm test}=10^{-9}.
+\]
+Una igualdad numerica \(a=b\) significa:
+\[
+|a-b|<\varepsilon_{\rm test}.
+\]
+Una igualdad vectorial o matricial \(M=0\) significa:
+\[
+\|M\|<\varepsilon_{\rm test}.
+\]
+
+\begin{warningbox}
+No cambiar la tolerancia para hacer pasar un test. Si un test falla con
+tolerancia \(10^{-9}\), se corrige el modulo correspondiente.
+\end{warningbox}
+
+\section{Regla de errores claros}
+
+Toda funcion debe fallar de manera clara. Si recibe un label, disco, pieza,
+segmento, arco, contacto, componente o cruce inexistente, debe levantar
+\texttt{ValueError}.
+
+Ejemplos:
+\begin{verbatim}
+ValueError("Unknown label: alpha")
+ValueError("Unknown disk id: 3")
+ValueError("Unknown piece: s7")
+ValueError("Invalid contact: [1, 5]")
+ValueError("Segment endpoint does not exist")
+ValueError("Unknown crossing: X3")
+ValueError("Component uses unknown piece: a12")
+\end{verbatim}
+
+\begin{checkpoint}
+Si un dato de entrada es invalido, el programa debe decir donde esta el problema.
+No debe fallar despues con un error oscuro.
+\end{checkpoint}
+
+\section{Arquitectura de la primera version}
+
+La primera version debe tener esta estructura:
+
+\begin{verbatim}
+csdraw_v03/
+  csdraw/
+    __init__.py
+    cs_geometry.py
+    length.py
+    rolling.py
+    reduced.py
+    descent.py
+    knot_diagram.py
+    crossings.py
+    variables.py
+    validation.py
+    optimise.py
+    io_json.py
+    render_svg.py
+  examples/
+    stadium_2.json
+    figure8_4_1_manual.json
+  main.py
+  README.md
+\end{verbatim}
+
+Los archivos del motor cs son:
+\begin{verbatim}
+cs_geometry.py
+length.py
+rolling.py
+reduced.py
+descent.py
+io_json.py
+render_svg.py
+\end{verbatim}
+
+Los archivos para diagramas de nudos son:
+\begin{verbatim}
+knot_diagram.py
+crossings.py
+validation.py
+\end{verbatim}
+
+Los archivos para optimizacion son:
+\begin{verbatim}
+variables.py
+optimise.py
+\end{verbatim}
+
+\section{Pipeline completo}
+
+El software debe seguir esta flecha:
+\[
+\boxed{
+\text{input}
+\to
+\text{puntos}
+\to
+\text{longitud}
+\to
+\text{SVG}
+\to
+\text{componentes}
+\to
+\text{cruces}
+\to
+4_1
+\to
+\text{rolling}
+\to
+\text{reducido}
+\to
+\text{descenso}
+\to
+\text{variables}
+\to
+\text{validacion}
+\to
+\text{optimizacion}.
+}
+\]
+
+En la primera semana solo se exige:
+\[
+\boxed{
+\text{stadium\_2 funciona}
+\quad\text{y}\quad
+\text{figure8\_4\_1\_manual funciona como diagrama con }4\text{ cruces}.
+}
+\]
+
+\section{No usamos codigo de Gauss en la primera version}
+
+No necesitamos codigo de Gauss para el primer test. La forma mas facil para
+Tomas es usar una declaracion explicita de componentes y una tabla explicita de
+cruces.
+
+El archivo del nudo \(4_1\) debe almacenar directamente:
+
+\begin{verbatim}
+components:
+  [
+    ["s1", "a1", "s2", "a2", "..."]
+  ]
+
+crossings:
+  id
+  over_piece
+  under_piece
+  point
+\end{verbatim}
+
+Esto quiere decir: el software no intentara reconocer automaticamente el tipo de
+nudo desde un codigo de Gauss. En la primera version, el archivo
+\texttt{figure8\_4\_1\_manual.json} declara que el dibujo proviene de un
+diagrama conocido del nudo \(4_1\), y el programa verifica que la estructura sea
+internamente consistente.
+
+\begin{warningbox}
+No implementar reconocimiento de nudos en la primera version. No implementar
+codigo de Gauss en la primera version. Primero necesitamos medir y validar un
+diagrama cs con una componente declarada y cuatro cruces declarados.
+\end{warningbox}
+
+\section{Datos cs que usa el programa}
+
+Un diagrama cs se almacena como:
+
+\begin{verbatim}
+disks:
+  id
+  center
+
+labels:
+  name
+  disk
+  theta
+
+segments:
+  id
+  start
+  end
+
+arcs:
+  id
+  start
+  end
+  disk
+  orientation
+
+contacts:
+  [i, j]
+\end{verbatim}
+
+La formula central es:
+\[
+p_\alpha
+=
+c_{k(\alpha)}
++
+(\cos\theta_\alpha,\sin\theta_\alpha).
+\]
+
+La longitud es:
+\[
+\Len
+=
+\sum_{s:\alpha\to\beta}\|p_\beta-p_\alpha\|
++
+\sum_{a:\alpha\to\beta}\Delta_a(\theta_\alpha,\theta_\beta).
+\]
+
+\begin{warningbox}
+Cada segmento y cada arco debe tener un identificador unico. Ejemplos:
+\texttt{s1}, \texttt{s2}, \texttt{a1}, \texttt{a2}. Estos identificadores se
+usan para declarar componentes y cruces.
+\end{warningbox}
+
+\begin{warningbox}
+En esta version, una ``pieza'' significa un segmento o un arco. Por tanto,
+\texttt{piece\_ids(diagram)} debe construir la lista de piezas como la union de
+los ids en \texttt{segments} y los ids en \texttt{arcs}. No hay una tercera lista
+\texttt{pieces} en el JSON.
+\end{warningbox}
+
+\section{Datos adicionales para un diagrama de nudo}
+
+Un diagrama de nudo necesita, ademas de los datos cs, una lista de componentes y
+una lista de cruces.
+
+La lista de componentes declara el recorrido de la curva:
+
+\begin{verbatim}
+components:
+  [
+    ["s1", "a1", "s2", "a2", "s3", "a3"]
+  ]
+\end{verbatim}
+
+Para un nudo de una componente, \texttt{components} debe tener longitud \(1\).
+
+\begin{warningbox}
+Aunque \texttt{stadium\_2.json} no es un nudo, debe incluir tambien el campo
+\texttt{components}. Esto permite testear \texttt{knot\_diagram.py} en un caso
+simple antes de usar \texttt{figure8\_4\_1\_manual.json}.
+\end{warningbox}
+
+\begin{warningbox}
+En esta primera version, las componentes se validan usando el recorrido declarado
+de piezas cs. No se reconstruyen a partir de los cruces. Los cruces sirven para
+over/under y dibujo, no para construir la componente.
+\end{warningbox}
+
+La lista de cruces declara over/under:
+
+\begin{verbatim}
+crossings:
+  id
+  over_piece
+  under_piece
+  point
+\end{verbatim}
+
+Ejemplo esquematico:
+\begin{verbatim}
+"crossings": [
+  {
+    "id": "X1",
+    "over_piece": "s3",
+    "under_piece": "s7",
+    "point": [0.0, 1.0]
+  }
+]
+\end{verbatim}
+
+Aqui \texttt{over\_piece} y \texttt{under\_piece} son identificadores de piezas
+cs. En la primera version, los cruces se declaran manualmente. El programa solo
+verifica consistencia interna.
+
+\begin{warningbox}
+En la primera version, el campo \texttt{point} de un cruce es solo una marca
+visual del cruce. No se usa para calcular la longitud ni para construir la
+componente. Tampoco se exige todavia verificar geometricamente que las dos
+piezas se intersecten exactamente en ese punto. Esa validacion se agrega
+despues.
+\end{warningbox}
+
+\section{Micro-modulo previo: construir los archivos JSON de test}
+
+\subsection{Archivo \texttt{stadium\_2.json}}
+
+El archivo \texttt{stadium\_2.json} debe ser un test cs simple, pero debe tener
+los mismos campos estructurales que un diagrama de nudo cuando esto sea posible.
+
+Debe incluir:
+
+\begin{verbatim}
+"type": "cs_loop",
+"name": "stadium_2",
+"components": [["s1", "a1", "s2", "a2"]],
+"crossings": []
+\end{verbatim}
+
+\begin{checkpoint}
+El estadio no tiene cruces, pero debe tener \texttt{crossings: []}. Asi el
+codigo de cruces no necesita tratar el estadio como caso especial.
+\end{checkpoint}
+
+\subsection{Archivo \texttt{figure8\_4\_1\_manual.json}}
+
+El archivo \texttt{figure8\_4\_1\_manual.json} debe tener discos, labels,
+segmentos, arcos, components y crossings.
+
+No se exige todavia que el dibujo sea perfecto. Se exige que el JSON sea
+legible, cerrado y tenga cuatro cruces declarados.
+
+Debe incluir:
+
+\begin{verbatim}
+"type": "knot_diagram",
+"name": "figure8_4_1_manual",
+"knot_label": "4_1"
+\end{verbatim}
+
+Debe incluir exactamente una componente:
+
+\begin{verbatim}
+"components": [
+  ["...", "...", "..."]
+]
+\end{verbatim}
+
+Debe incluir exactamente cuatro cruces:
+
+\begin{verbatim}
+"crossings": [
+  {"id": "X1", "over_piece": "...", "under_piece": "...", "point": [...]},
+  {"id": "X2", "over_piece": "...", "under_piece": "...", "point": [...]},
+  {"id": "X3", "over_piece": "...", "under_piece": "...", "point": [...]},
+  {"id": "X4", "over_piece": "...", "under_piece": "...", "point": [...]}
+]
+\end{verbatim}
+
+\begin{checkpoint}
+Antes de programar \texttt{crossings.py}, abrir el JSON y verificar visualmente
+que existen exactamente cuatro ids de cruces: \texttt{X1}, \texttt{X2},
+\texttt{X3}, \texttt{X4}.
+\end{checkpoint}
+
+\section{Que significa verificar \(4_1\) en esta version}
+
+El programa no demuestra automaticamente que el nudo sea \(4_1\). El archivo
+\texttt{figure8\_4\_1\_manual.json} debe construirse a partir de un diagrama
+conocido de \(4_1\), incluyendo sus piezas, su recorrido de componente y sus
+cruces over/under. El programa verifica que esos datos sean internamente
+consistentes.
+
+El test de \(4_1\) debe verificar:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item el archivo tiene \texttt{"type": "knot\_diagram"};
+\item el archivo tiene \texttt{"knot\_label": "4\_1"};
+\item hay exactamente cuatro cruces declarados;
+\item cada cruce tiene id unico;
+\item cada cruce tiene una pieza over y una pieza under;
+\item las piezas over/under existen;
+\item la pieza over y la pieza under no son la misma;
+\item hay exactamente una componente declarada;
+\item la componente usa solo piezas existentes;
+\item cada pieza de \texttt{segments} y \texttt{arcs} aparece exactamente una vez
+en alguna componente;
+\item la componente es cerrada;
+\item la longitud cs se puede calcular;
+\item se puede exportar SVG.
+\end{enumerate}
+
+\begin{checkpoint}
+Para \texttt{figure8\_4\_1\_manual.json}, el programa debe reportar:
+\begin{verbatim}
+knot label: 4_1
+number of crossings: 4
+number of components: 1
+component pieces valid: True
+all pieces used exactly once: True
+component closed: True
+crossing ids valid: True
+crossing pieces valid: True
+over/under valid: True
+crossings valid: True
+length valid: True
+\end{verbatim}
+\end{checkpoint}
+
+\begin{checkpoint}
+Para \texttt{figure8\_4\_1\_manual.json}, la longitud debe ser finita y positiva:
+\[
+0<\Len<+\infty.
+\]
+No se exige un valor numerico especifico en la primera version.
+\end{checkpoint}
+
+\begin{checkpoint}
+Para \texttt{figure8\_4\_1\_manual.json}, si el JSON no cambia, la longitud debe
+ser reproducible: dos ejecuciones consecutivas deben dar el mismo valor
+numerico.
+\end{checkpoint}
+
+\section{Test obligatorio 1: \texttt{stadium\_2.json}}
+
+\subsection{Rol del test}
+
+\texttt{stadium\_2.json} es el primer test obligatorio. No es un nudo. Es el
+test unitario del motor geometrico cs.
+
+Verifica:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item lectura JSON;
+\item discos y labels;
+\item puntos \(p_\alpha\);
+\item segmentos;
+\item arcos;
+\item longitud;
+\item SVG;
+\item componentes declaradas;
+\item cruces vacios;
+\item contactos;
+\item matriz \(A(c)\);
+\item kernel de \(A(c)\);
+\item gradiente reducido;
+\item test de descenso.
+\end{enumerate}
+
+\subsection{Datos}
+
+\[
+c_1=(0,0),
+\qquad
+c_2=(2,0).
+\]
+
+Hay dos segmentos de longitud \(2\) y dos semicirculos de longitud \(\pi\).
+Por tanto:
+\[
+\Len=2+2+\pi+\pi=4+2\pi.
+\]
+
+Valor numerico esperado:
+\[
+\Len=10.283185307179586.
+\]
+
+\subsection{Comando}
+
+\begin{verbatim}
+python main.py examples/stadium_2.json
+\end{verbatim}
+
+\subsection{Salida esperada}
+
+\begin{verbatim}
+Diagram: stadium_2
+Type: cs_loop
+Number of disks: 2
+Number of labels: 4
+Number of segments: 2
+Number of arcs: 2
+Number of components: 1
+Number of crossings: 0
+Total length: 10.283185307179586
+Rolling matrix A:
+[[-1.,  0.,  1., -0.]]
+rank A: 1
+dim Roll: 3
+shape K: (4, 3)
+norm A K: < 1e-9
+g_red: [-2, 0, 2, 0]
+stationary: True
+has descent: False
+SVG written to: examples/stadium_2.svg
+\end{verbatim}
+
+\begin{checkpoint}
+Si \texttt{stadium\_2.json} falla, no se prueba \(4_1\). Primero se corrige el
+motor geometrico.
+\end{checkpoint}
+
+\section{Test obligatorio 2: \texttt{figure8\_4\_1\_manual.json}}
+
+\subsection{Rol del test}
+
+\texttt{figure8\_4\_1\_manual.json} es el primer test real de diagrama de nudo.
+No prueba reconocimiento automatico. Prueba que el software puede leer, medir,
+dibujar y validar un diagrama cs de nudo con cruces.
+
+\subsection{Datos esperados}
+
+El archivo debe tener:
+
+\begin{verbatim}
+"type": "knot_diagram"
+"knot_label": "4_1"
+\end{verbatim}
+
+Debe tener exactamente una componente declarada:
+
+\begin{verbatim}
+components:
+  [
+    ["...", "...", "..."]
+  ]
+\end{verbatim}
+
+Debe tener cuatro cruces declarados:
+
+\begin{verbatim}
+crossings:
+  [
+    {"id": "X1", "over_piece": "...", "under_piece": "...", "point": [...]},
+    {"id": "X2", "over_piece": "...", "under_piece": "...", "point": [...]},
+    {"id": "X3", "over_piece": "...", "under_piece": "...", "point": [...]},
+    {"id": "X4", "over_piece": "...", "under_piece": "...", "point": [...]}
+  ]
+\end{verbatim}
+
+\subsection{Comando}
+
+\begin{verbatim}
+python main.py examples/figure8_4_1_manual.json
+\end{verbatim}
+
+\subsection{Salida esperada}
+
+\begin{verbatim}
+Diagram: figure8_4_1_manual
+Type: knot_diagram
+Knot label: 4_1
+Number of crossings: 4
+Number of components: 1
+Component pieces valid: True
+All pieces used exactly once: True
+Component closed: True
+Crossing ids valid: True
+Crossing pieces valid: True
+Over/under valid: True
+Crossings valid: True
+One component: True
+Total length:
+SVG written to: examples/figure8_4_1_manual.svg
+\end{verbatim}
+
+\begin{checkpoint}
+Si \texttt{figure8\_4\_1\_manual.json} falla, no pasar a optimizacion. Primero
+corregir componentes, cruces, piezas o JSON.
+\end{checkpoint}
+
+\section{Modulo 1: \texttt{cs\_geometry.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo define la geometria cs:
+
+\begin{verbatim}
+Disk
+Label
+SegmentPiece
+ArcPiece
+CSRealization
+\end{verbatim}
+
+Su funcion mas importante es:
+
+\begin{verbatim}
+point(label_name)
+\end{verbatim}
+
+Debe calcular:
+\[
+p_\alpha=c_{k(\alpha)}+(\cos\theta_\alpha,\sin\theta_\alpha).
+\]
+
+\subsection{Test}
+
+Para el estadio:
+\[
+p_\alpha=(0,1),
+\quad
+p_\beta=(0,-1),
+\quad
+p_\gamma=(2,1),
+\quad
+p_\delta=(2,-1).
+\]
+
+\begin{checkpoint}
+Si estos cuatro puntos no salen bien, no revisar longitud. Primero corregir
+\texttt{cs\_geometry.py}.
+\end{checkpoint}
+
+\section{Modulo 2: \texttt{length.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo calcula:
+
+\begin{verbatim}
+segment_length(cs, s)
+arc_length(cs, a)
+total_length(cs)
+length_report(cs)
+\end{verbatim}
+
+Formula de segmento:
+\[
+\ell_s=\|p_\beta-p_\alpha\|.
+\]
+
+Formula de arco:
+\[
+\ell_a=\Delta_a(\theta_\alpha,\theta_\beta).
+\]
+
+\subsection{Test}
+
+Para el estadio:
+\[
+\ell_{\alpha\gamma}=2,
+\qquad
+\ell_{\delta\beta}=2,
+\qquad
+\ell_{\gamma\delta}=\pi,
+\qquad
+\ell_{\beta\alpha}=\pi.
+\]
+
+Total:
+\[
+\Len=10.283185307179586.
+\]
+
+\begin{checkpoint}
+Si la longitud total falla, corregir \texttt{length.py}. No tocar los modulos de
+componentes ni cruces.
+\end{checkpoint}
+
+\section{Modulo 3: \texttt{knot\_diagram.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo valida la estructura de componentes y permite tratar el archivo como
+diagrama de nudo.
+
+No reconoce el tipo de nudo. Solo verifica estructura minima.
+
+\subsection{Funciones}
+
+\begin{verbatim}
+validate_knot_metadata(diagram)
+piece_ids(diagram)
+piece_graph(diagram)
+validate_components(diagram)
+all_pieces_used_once(diagram)
+component_count(diagram)
+component_closed(diagram, component)
+is_one_component(diagram)
+knot_diagram_report(diagram)
+\end{verbatim}
+
+\subsection{Micro-modulo K0: validar metadata de nudo}
+
+Funcion:
+\begin{verbatim}
+validate_knot_metadata(diagram)
+\end{verbatim}
+
+Debe verificar que, para \texttt{figure8\_4\_1\_manual.json},
+\begin{verbatim}
+type == "knot_diagram"
+knot_label == "4_1"
+\end{verbatim}
+
+\begin{checkpoint}
+Si el campo \texttt{type} o \texttt{knot\_label} falta, el programa debe levantar
+\texttt{ValueError} con un mensaje claro.
+\end{checkpoint}
+
+\subsection{Micro-modulo K1: lista de piezas}
+
+Funcion:
+\begin{verbatim}
+piece_ids(diagram)
+\end{verbatim}
+
+Debe devolver todos los identificadores de piezas cs. Una pieza es un segmento o
+un arco. Por ejemplo:
+
+\begin{verbatim}
+["s1", "s2", "a1", "a2"]
+\end{verbatim}
+
+\begin{checkpoint}
+Cada segmento y cada arco debe tener un identificador unico.
+\end{checkpoint}
+
+\subsection{Micro-modulo K2: validar componentes}
+
+Funcion:
+\begin{verbatim}
+validate_components(diagram)
+\end{verbatim}
+
+Debe verificar:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item existe el campo \texttt{components};
+\item cada componente es una lista de piezas;
+\item cada pieza mencionada existe;
+\item ninguna componente esta vacia;
+\item cada pieza de \texttt{segments} y \texttt{arcs} aparece exactamente una vez
+en alguna componente.
+\end{enumerate}
+
+\begin{checkpoint}
+Para \texttt{figure8\_4\_1\_manual.json}, debe devolver:
+\begin{verbatim}
+component pieces valid: True
+all pieces used exactly once: True
+\end{verbatim}
+\end{checkpoint}
+
+\subsection{Micro-modulo K3: componente cerrada}
+
+Funcion:
+\begin{verbatim}
+component_closed(diagram, component)
+\end{verbatim}
+
+Debe verificar que las piezas se puedan recorrer consecutivamente.
+
+Para cualquier pieza \(P\), sea \(\operatorname{start}(P)\) su label inicial y
+\(\operatorname{end}(P)\) su label final. Si \(P\) es un segmento, estos campos
+vienen de \texttt{segments}. Si \(P\) es un arco, estos campos vienen de
+\texttt{arcs}. La funcion \texttt{component\_closed} no distingue entre
+segmentos y arcos: solo usa \texttt{start} y \texttt{end}.
+
+Si una pieza \(P_i\) termina en el label \(\beta\), la siguiente pieza
+\(P_{i+1}\) debe empezar en \(\beta\). Ademas, la ultima pieza debe terminar en
+el label donde empieza la primera.
+
+\begin{checkpoint}
+Para el estadio y para \(4_1\), debe devolver:
+\begin{verbatim}
+component closed: True
+\end{verbatim}
+\end{checkpoint}
+
+\subsection{Micro-modulo K4: contar componentes}
+
+Funcion:
+\begin{verbatim}
+component_count(diagram)
+\end{verbatim}
+
+Para el estadio:
+\[
+\#\text{componentes}=1.
+\]
+
+Para \(4_1\):
+\[
+\#\text{componentes}=1.
+\]
+
+\begin{checkpoint}
+El test \(4_1\) debe decir:
+\begin{verbatim}
+one component: True
+\end{verbatim}
+\end{checkpoint}
+
+\section{Modulo 4: \texttt{crossings.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo valida los cruces declarados manualmente.
+
+No debe reconocer nudos. No debe usar codigo de Gauss. Solo verifica que la
+tabla de cruces sea consistente.
+
+\subsection{Funciones}
+
+\begin{verbatim}
+crossing_count(diagram)
+validate_crossing_ids(diagram)
+validate_crossing_pieces(diagram)
+validate_over_under(diagram)
+crossing_report(diagram)
+\end{verbatim}
+
+\subsection{Micro-modulo C1: contar cruces}
+
+Funcion:
+\begin{verbatim}
+crossing_count(diagram)
+\end{verbatim}
+
+Para el estadio:
+\[
+\#\text{cruces}=0.
+\]
+
+Para \(4_1\):
+\[
+\#\text{cruces}=4.
+\]
+
+\begin{checkpoint}
+El reporte debe decir:
+\begin{verbatim}
+stadium_2: number of crossings = 0
+figure8_4_1_manual: number of crossings = 4
+\end{verbatim}
+\end{checkpoint}
+
+\subsection{Micro-modulo C2: ids de cruces}
+
+Funcion:
+\begin{verbatim}
+validate_crossing_ids(diagram)
+\end{verbatim}
+
+Debe verificar que cada cruce tenga un id y que los ids no se repitan.
+
+\begin{checkpoint}
+Para \(4_1\), los ids esperados son \texttt{X1}, \texttt{X2}, \texttt{X3},
+\texttt{X4}, sin repeticiones.
+\end{checkpoint}
+
+\subsection{Micro-modulo C3: validar piezas de cruce}
+
+Funcion:
+\begin{verbatim}
+validate_crossing_pieces(diagram)
+\end{verbatim}
+
+Debe verificar que cada \texttt{over\_piece} y cada \texttt{under\_piece}
+existan como piezas cs.
+
+\begin{checkpoint}
+Si un cruce menciona una pieza inexistente, debe levantar \texttt{ValueError}.
+\end{checkpoint}
+
+\subsection{Micro-modulo C4: validar over/under}
+
+Funcion:
+\begin{verbatim}
+validate_over_under(diagram)
+\end{verbatim}
+
+Debe verificar:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item cada cruce tiene una pieza over;
+\item cada cruce tiene una pieza under;
+\item la pieza over y la pieza under no son la misma;
+\item el punto del cruce tiene dos coordenadas reales.
+\end{enumerate}
+
+\begin{checkpoint}
+Para \texttt{figure8\_4\_1\_manual.json}, debe devolver \texttt{True}.
+\end{checkpoint}
+
+\subsection{Micro-modulo C5: reporte de cruces}
+
+Funcion:
+\begin{verbatim}
+crossing_report(diagram)
+\end{verbatim}
+
+Salida esperada para \(4_1\):
+\begin{verbatim}
+number of crossings: 4
+crossing ids valid: True
+crossing pieces valid: True
+over/under valid: True
+crossings valid: True
+\end{verbatim}
+
+\begin{taskbox}
+Actualizar \texttt{main.py} para imprimir \texttt{crossing\_report} si el JSON
+contiene una lista \texttt{crossings}.
+\end{taskbox}
+
+\begin{checkpoint}
+No pasar a rolling, reduced ni descent para \(4_1\) hasta que
+\texttt{crossing\_report} funcione para \(4_1\).
+\end{checkpoint}
+
+\section{Modulo 5: reporte de diagrama de nudo}
+
+\subsection{Responsabilidad}
+
+El reporte de diagrama de nudo junta la informacion de metadata, componentes,
+cruces, longitud y SVG.
+
+\subsection{Funcion}
+
+\begin{verbatim}
+knot_diagram_report(diagram)
+\end{verbatim}
+
+Salida esperada para \(4_1\):
+\begin{verbatim}
+Diagram: figure8_4_1_manual
+Type: knot_diagram
+Knot label: 4_1
+Number of crossings: 4
+Number of components: 1
+Component pieces valid: True
+All pieces used exactly once: True
+Component closed: True
+Crossings valid: True
+One component: True
+Total length:
+SVG written to: examples/figure8_4_1_manual.svg
+\end{verbatim}
+
+\begin{taskbox}
+Actualizar \texttt{main.py} para llamar \texttt{knot\_diagram\_report} cuando el
+JSON tenga:
+\begin{verbatim}
+"type": "knot_diagram"
+\end{verbatim}
+\end{taskbox}
+
+\begin{checkpoint}
+Este es el primer test real del proyecto como software para diagramas cs de
+nudos.
+\end{checkpoint}
+
+\section{Modulo 6: \texttt{rolling.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo calcula la matriz de rolling \(A(c)\).
+
+Para un contacto \(\{i,j\}\), se define:
+\[
+u_{ij}=\frac{c_i-c_j}{\|c_i-c_j\|}.
+\]
+
+La restriccion linealizada es:
+\[
+\langle u_{ij},\delta c_i-\delta c_j\rangle=0.
+\]
+
+Entonces \(A(c)\) tiene una fila por contacto.
+
+\subsection{Funciones}
+
+\begin{verbatim}
+build_A(cs, contacts)
+contact_residuals(cs, contacts)
+validate_contacts(cs, contacts)
+kernel_basis(A)
+rolling_report(cs, contacts)
+\end{verbatim}
+
+\subsection{Test para estadio}
+
+Para el estadio:
+\[
+A(c)=
+\begin{pmatrix}
+-1&0&1&0
+\end{pmatrix},
+\qquad
+\rank A=1,
+\qquad
+\dim\Roll(c)=3.
+\]
+
+Ademas, si \(K\) genera \(\Ker A(c)\), debe cumplirse:
+\[
+K\in\R^{4\times 3},
+\qquad
+\|AK\|<10^{-9}.
+\]
+
+\begin{checkpoint}
+Si \(A(c)\) o \(K\) fallan para el estadio, no pasar a \texttt{reduced.py}.
+\end{checkpoint}
+
+\section{Modulo 7: \texttt{reduced.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo calcula el gradiente reducido \(g_{\rm red}\) y el test reducido de
+estacionariedad.
+
+No usa gauge. No usa \(\omega\). Solo usa centros, segmentos y \(A(c)\).
+
+\subsection{Funciones}
+
+\begin{verbatim}
+assemble_g_red(cs)
+reduced_kernel_residual(cs, contacts)
+row_space_residual(cs, contacts)
+reduced_stationarity_report(cs, contacts)
+\end{verbatim}
+
+\subsection{Test para estadio}
+
+Para el estadio:
+\[
+g_{\rm red}=(-2,0,2,0)^T.
+\]
+
+Tambien:
+\[
+\|g_{\rm red}^TK\|<10^{-9}.
+\]
+
+Y:
+\[
+g_{\rm red}=2A(c)^T.
+\]
+
+Salida esperada:
+\begin{verbatim}
+g_red: [-2, 0, 2, 0]
+shape K: (4, 3)
+norm A K: < 1e-9
+rank A: 1
+dim Roll: 3
+kernel residual: < 1e-9
+row-space residual: < 1e-9
+stationary: True
+\end{verbatim}
+
+\begin{checkpoint}
+No pasar a \texttt{descent.py} hasta que el estadio sea estacionario.
+\end{checkpoint}
+
+\section{Modulo 8: \texttt{descent.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo encuentra una direccion de descenso cuando el diagrama no es
+estacionario.
+
+Si \(K\) genera \(\Roll(c)\), toda direccion admisible lineal tiene la forma:
+\[
+\delta c=Ky.
+\]
+
+Si \(g_{\rm red}^TK\neq0\), una direccion de descenso es:
+\[
+\delta c=-KK^Tg_{\rm red}.
+\]
+
+\subsection{Funciones}
+
+\begin{verbatim}
+find_descent_direction(cs, contacts)
+descent_report(cs, contacts)
+\end{verbatim}
+
+\subsection{Test para estadio}
+
+Como el estadio es estacionario:
+\[
+\|\text{gradiente proyectado}\|<10^{-9}.
+\]
+
+Salida esperada:
+\begin{verbatim}
+projected gradient norm: < 1e-9
+has descent: False
+\end{verbatim}
+
+\begin{checkpoint}
+No pasar a variables u optimizacion si este test falla.
+\end{checkpoint}
+
+\section{Modulo 9: \texttt{variables.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo empaqueta y desempaqueta variables para optimizacion no lineal.
+
+Variables:
+\[
+x=(c_{1x},c_{1y},\ldots,c_{Nx},c_{Ny},
+\theta_{\alpha_1},\ldots,\theta_{\alpha_M}).
+\]
+
+\subsection{Funciones}
+
+\begin{verbatim}
+pack_variables(cs)
+unpack_variables(x, template)
+variable_report(cs)
+\end{verbatim}
+
+\begin{warningbox}
+El orden de las etiquetas debe ser el mismo en \texttt{pack\_variables},
+\texttt{unpack\_variables}, \texttt{assemble\_g\_red} y todos los reportes.
+\end{warningbox}
+
+\subsection{Test para estadio}
+
+Para el estadio:
+\[
+N=2,\qquad M=4,\qquad x\in\R^8.
+\]
+
+Salida esperada:
+\begin{verbatim}
+number of disks: 2
+number of labels: 4
+number of variables: 8
+pack/unpack length error: < 1e-9
+\end{verbatim}
+
+\begin{checkpoint}
+No pasar a \texttt{optimise.py} hasta que pack/unpack conserve la longitud.
+\end{checkpoint}
+
+\section{Modulo 10: \texttt{validation.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo valida que una configuracion siga siendo admisible.
+
+\subsection{Funciones}
+
+\begin{verbatim}
+check_contacts(cs, contacts)
+check_disk_clearance(cs, contacts)
+minimum_clearance(cs, contacts)
+validation_report(cs, contacts)
+\end{verbatim}
+
+\subsection{Tests}
+
+Para el estadio:
+\[
+\|c_1-c_2\|-2=0.
+\]
+
+Para \(4_1\), el reporte debe verificar:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item metadata valida;
+\item cruces validos;
+\item una componente;
+\item todas las piezas usadas exactamente una vez;
+\item componente cerrada;
+\item contactos validos, si hay contactos prescritos;
+\item no solapamiento de discos;
+\item longitud computable.
+\end{enumerate}
+
+Salida esperada para \(4_1\):
+\begin{verbatim}
+metadata valid: True
+crossings valid: True
+one component: True
+all pieces used exactly once: True
+component closed: True
+contacts valid: True
+disk clearance valid: True
+length valid: True
+valid: True
+\end{verbatim}
+
+\begin{checkpoint}
+No pasar a optimizacion si \texttt{validation\_report} no dice
+\texttt{valid: True}.
+\end{checkpoint}
+
+\section{Modulo 11: \texttt{optimise.py}}
+
+\subsection{Responsabilidad}
+
+Este modulo minimiza la longitud para un tipo cs fijo.
+
+No se debe escribir antes de que funcionen:
+
+\begin{verbatim}
+length.py
+knot_diagram.py
+crossings.py
+rolling.py
+reduced.py
+descent.py
+variables.py
+validation.py
+\end{verbatim}
+
+\begin{warningbox}
+En la primera semana no se exige obtener un minimo. Solo se exige que
+\texttt{objective\_length}, \texttt{contact\_constraints} y
+\texttt{clearance\_constraints} funcionen y pasen sus tests.
+\end{warningbox}
+
+\subsection{Funciones}
+
+\begin{verbatim}
+objective_length(x, template)
+contact_constraints(x, template, contacts)
+clearance_constraints(x, template, contacts)
+minimise_length(template, contacts)
+optimisation_report(result, template, contacts)
+\end{verbatim}
+
+\subsection{Micro-modulo O1: objetivo de longitud}
+
+Funcion:
+\begin{verbatim}
+objective_length(x, template)
+\end{verbatim}
+
+Debe desempaquetar \(x\), construir la realizacion cs y devolver \(\Len\).
+
+Test para estadio:
+\begin{verbatim}
+x = pack_variables(cs)
+objective_length(x, cs) = 10.283185307179586
+\end{verbatim}
+
+\begin{checkpoint}
+Si este test falla, no implementar restricciones.
+\end{checkpoint}
+
+\subsection{Micro-modulo O2: restricciones de contacto}
+
+Para cada contacto:
+\[
+h_{ij}(x)=\|c_i-c_j\|-2.
+\]
+
+Debe imponerse:
+\[
+h_{ij}(x)=0.
+\]
+
+\subsection{Micro-modulo O3: restricciones de clearance}
+
+Para cada no contacto:
+\[
+q_{ij}(x)=\|c_i-c_j\|-2.
+\]
+
+Debe imponerse:
+\[
+q_{ij}(x)\geq0.
+\]
+
+\begin{warningbox}
+Contactos prescritos son igualdades. No contactos son desigualdades. No mezclar.
+\end{warningbox}
+
+\subsection{Micro-modulo O4: primer minimizador}
+
+Usar inicialmente:
+\begin{verbatim}
+scipy.optimize.minimize(method="SLSQP")
+\end{verbatim}
+
+\begin{checkpoint}
+No correr SLSQP hasta que \texttt{objective\_length},
+\texttt{contact\_constraints} y \texttt{clearance\_constraints} funcionen.
+\end{checkpoint}
+
+\section{Plan de trabajo de 7 dias}
+
+\subsection*{Dia 1: motor cs basico}
+
+Correr:
+\begin{verbatim}
+python main.py examples/stadium_2.json
+\end{verbatim}
+
+Entregar:
+\begin{verbatim}
+Total length = 10.283185307179586
+SVG generado
+\end{verbatim}
+
+\subsection*{Dia 2: componentes declaradas}
+
+Implementar:
+\begin{verbatim}
+knot_diagram.py
+\end{verbatim}
+
+Entregar:
+\begin{verbatim}
+stadium_2: number of components = 1
+figure8_4_1_manual: number of components = 1
+component pieces valid: True
+all pieces used exactly once: True
+component closed: True
+\end{verbatim}
+
+\subsection*{Dia 3: cruces manuales}
+
+Implementar:
+\begin{verbatim}
+crossings.py
+\end{verbatim}
+
+Entregar:
+\begin{verbatim}
+stadium_2: number of crossings = 0
+figure8_4_1_manual: number of crossings = 4
+crossing ids valid: True
+crossings valid: True
+\end{verbatim}
+
+\subsection*{Dia 4: primer reporte de nudo}
+
+Actualizar:
+\begin{verbatim}
+main.py
+\end{verbatim}
+
+Entregar:
+\begin{verbatim}
+Diagram: figure8_4_1_manual
+Knot label: 4_1
+Number of crossings: 4
+Number of components: 1
+All pieces used exactly once: True
+Component closed: True
+One component: True
+Total length:
+SVG written
+\end{verbatim}
+
+\subsection*{Dia 5: rolling, reducido y descenso}
+
+Implementar o verificar:
+\begin{verbatim}
+rolling.py
+reduced.py
+descent.py
+\end{verbatim}
+
+Entregar para estadio:
+\begin{verbatim}
+A matrix
+rank A
+dim Roll
+shape K
+norm A K < 1e-9
+g_red = [-2, 0, 2, 0]
+stationary: True
+has descent: False
+\end{verbatim}
+
+\begin{warningbox}
+En el Dia 5, rolling, reduced y descent se testean primero solo en
+\texttt{stadium\_2.json}. No se exige todavia que el gradiente reducido sea
+estacionario para \(4_1\).
+\end{warningbox}
+
+\subsection*{Dia 6: variables y validacion}
+
+Implementar:
+\begin{verbatim}
+variables.py
+validation.py
+\end{verbatim}
+
+Entregar:
+\begin{verbatim}
+pack/unpack conserva longitud
+validation_report pasa para stadium_2
+validation_report pasa para figure8_4_1_manual
+\end{verbatim}
+
+\subsection*{Dia 7: preparar optimizacion}
+
+Implementar:
+\begin{verbatim}
+optimise.py
+\end{verbatim}
+
+Solo hasta:
+\begin{verbatim}
+objective_length
+contact_constraints
+clearance_constraints
+\end{verbatim}
+
+No correr SLSQP todavia.
+
+\section{Regla final}
+
+Este proyecto es para construir software de diagramas cs de nudos. Por eso hay
+dos tests obligatorios:
+
+\[
+\boxed{
+\texttt{stadium\_2.json}
+=
+\text{test geometrico minimo}
+}
+\]
+
+\[
+\boxed{
+\texttt{figure8\_4\_1\_manual.json}
+=
+\text{primer test real de diagrama de nudo}
+}
+\]
+
+La cadena de verdad es:
+\[
+\boxed{
+\text{cs engine}
+\to
+\text{components}
+\to
+\text{crossings}
+\to
+4_1
+\to
+\text{rolling}
+\to
+\text{reduced}
+\to
+\text{descent}
+\to
+\text{validation}
+\to
+\text{optimisation}.
+}
+\]
+
+Si una flecha falla, se corrige esa flecha antes de avanzar.
+
+\end{document}

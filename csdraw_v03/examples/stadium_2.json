@@ -1,0 +1,25 @@
+{
+  "type": "cs_loop",
+  "name": "stadium_2",
+  "disks": [
+    {"id": 1, "center": [0.0, 0.0]},
+    {"id": 2, "center": [2.0, 0.0]}
+  ],
+  "labels": [
+    {"name": "alpha", "disk": 1, "theta": 1.5707963267948966},
+    {"name": "beta",  "disk": 1, "theta": -1.5707963267948966},
+    {"name": "gamma", "disk": 2, "theta": 1.5707963267948966},
+    {"name": "delta", "disk": 2, "theta": -1.5707963267948966}
+  ],
+  "segments": [
+    {"id": "s1", "start": "alpha", "end": "gamma"},
+    {"id": "s2", "start": "delta", "end": "beta"}
+  ],
+  "arcs": [
+    {"id": "a1", "start": "gamma", "end": "delta", "disk": 2, "orientation": "cw"},
+    {"id": "a2", "start": "beta",  "end": "alpha", "disk": 1, "orientation": "cw"}
+  ],
+  "contacts": [[1, 2]],
+  "components": [["s1", "a1", "s2", "a2"]],
+  "crossings": []
+}
