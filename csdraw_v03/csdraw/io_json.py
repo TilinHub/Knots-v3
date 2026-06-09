@@ -19,6 +19,7 @@ from .cs_geometry import (
     Label,
     SegmentPiece,
     ArcPiece,
+    Crossing,
     CSRealization,
 )
 
@@ -48,18 +49,27 @@ def load_diagram(path: str) -> CSRealization:
             raise ValueError(f"Unknown disk id: {disk}")
         labels[name] = Label(name=name, disk=disk, theta=float(theta))
 
+    # Cada pieza (segmento o arco) debe tener un id unico, ya que esos ids se
+    # usan para declarar componentes y cruces.
+    piece_ids = set()
+
     segments = {}
     for raw in data.get("segments", []):
         sid = _require(raw, "id", "segment")
+        if sid in piece_ids:
+            raise ValueError(f"Duplicate piece id: {sid}")
         start = _require(raw, "start", f"segment {sid}")
         end = _require(raw, "end", f"segment {sid}")
         if start not in labels or end not in labels:
             raise ValueError("Segment endpoint does not exist")
+        piece_ids.add(sid)
         segments[sid] = SegmentPiece(id=sid, start=start, end=end)
 
     arcs = {}
     for raw in data.get("arcs", []):
         aid = _require(raw, "id", "arc")
+        if aid in piece_ids:
+            raise ValueError(f"Duplicate piece id: {aid}")
         start = _require(raw, "start", f"arc {aid}")
         end = _require(raw, "end", f"arc {aid}")
         disk = _require(raw, "disk", f"arc {aid}")
@@ -68,6 +78,7 @@ def load_diagram(path: str) -> CSRealization:
             raise ValueError("Segment endpoint does not exist")
         if disk not in disks:
             raise ValueError(f"Unknown disk id: {disk}")
+        piece_ids.add(aid)
         arcs[aid] = ArcPiece(
             id=aid, start=start, end=end, disk=disk, orientation=orientation
         )
@@ -85,12 +96,31 @@ def load_diagram(path: str) -> CSRealization:
             raise ValueError(f"Invalid contact: {shown}")
         contacts.append([raw[0], raw[1]])
 
+    # Datos de diagrama de nudo. Las componentes se guardan como el recorrido
+    # declarado de piezas; no se reconstruyen desde los cruces. Los cruces se
+    # parsean a estructura; su validez (over/under, existencia de piezas) la
+    # comprueba crossings.py, no este lector.
+    components = [list(comp) for comp in data.get("components", [])]
+
+    crossings = []
+    for raw in data.get("crossings", []):
+        cid = _require(raw, "id", "crossing")
+        over = _require(raw, "over_piece", f"crossing {cid}")
+        under = _require(raw, "under_piece", f"crossing {cid}")
+        point = _require(raw, "point", f"crossing {cid}")
+        crossings.append(
+            Crossing(
+                id=cid,
+                over_piece=over,
+                under_piece=under,
+                point=tuple(point),
+            )
+        )
+
     meta = {
         "type": data.get("type"),
         "name": data.get("name"),
         "knot_label": data.get("knot_label"),
-        "components": data.get("components", []),
-        "crossings": data.get("crossings", []),
     }
 
     return CSRealization(
@@ -99,5 +129,7 @@ def load_diagram(path: str) -> CSRealization:
         segments=segments,
         arcs=arcs,
         contacts=contacts,
+        components=components,
+        crossings=crossings,
         meta=meta,
     )

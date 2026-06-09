@@ -16,6 +16,11 @@ from csdraw.render_svg import write_svg
 
 
 def run(json_path: str):
+    # Pipeline completo (seccion 6):
+    #   input -> puntos -> longitud -> SVG -> componentes -> cruces -> 4_1
+    #   -> rolling -> reducido -> descenso -> variables -> validacion -> optimizacion
+    # main.py cubre hoy el tramo vivo: input -> puntos -> longitud -> SVG.
+    # Las etapas siguientes son stubs declarados y se conectan en sus puntos.
     cs = load_diagram(json_path)
     meta = cs.meta
 
@@ -25,8 +30,8 @@ def run(json_path: str):
     print(f"Number of labels: {len(cs.labels)}")
     print(f"Number of segments: {len(cs.segments)}")
     print(f"Number of arcs: {len(cs.arcs)}")
-    print(f"Number of components: {len(meta.get('components', []))}")
-    print(f"Number of crossings: {len(meta.get('crossings', []))}")
+    print(f"Number of components: {len(cs.components)}")
+    print(f"Number of crossings: {len(cs.crossings)}")
     print(f"Total length: {total_length(cs)}")
 
     svg_path = os.path.splitext(json_path)[0] + ".svg"

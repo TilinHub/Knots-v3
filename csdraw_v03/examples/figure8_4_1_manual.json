@@ -1,0 +1,43 @@
+{
+  "type": "knot_diagram",
+  "name": "figure8_4_1_manual",
+  "knot_label": "4_1",
+  "disks": [
+    {"id": 1, "center": [0.0, 0.0]},
+    {"id": 2, "center": [4.0, 0.0]},
+    {"id": 3, "center": [4.0, 4.0]},
+    {"id": 4, "center": [0.0, 4.0]}
+  ],
+  "labels": [
+    {"name": "d1a", "disk": 1, "theta": 3.141592653589793},
+    {"name": "d1b", "disk": 1, "theta": -1.5707963267948966},
+    {"name": "d2a", "disk": 2, "theta": -1.5707963267948966},
+    {"name": "d2b", "disk": 2, "theta": 0.0},
+    {"name": "d3a", "disk": 3, "theta": 0.0},
+    {"name": "d3b", "disk": 3, "theta": 1.5707963267948966},
+    {"name": "d4a", "disk": 4, "theta": 1.5707963267948966},
+    {"name": "d4b", "disk": 4, "theta": 3.141592653589793}
+  ],
+  "segments": [
+    {"id": "s1", "start": "d1b", "end": "d2a"},
+    {"id": "s2", "start": "d2b", "end": "d3a"},
+    {"id": "s3", "start": "d3b", "end": "d4a"},
+    {"id": "s4", "start": "d4b", "end": "d1a"}
+  ],
+  "arcs": [
+    {"id": "a1", "start": "d1a", "end": "d1b", "disk": 1, "orientation": "ccw"},
+    {"id": "a2", "start": "d2a", "end": "d2b", "disk": 2, "orientation": "ccw"},
+    {"id": "a3", "start": "d3a", "end": "d3b", "disk": 3, "orientation": "ccw"},
+    {"id": "a4", "start": "d4a", "end": "d4b", "disk": 4, "orientation": "ccw"}
+  ],
+  "contacts": [],
+  "components": [
+    ["a1", "s1", "a2", "s2", "a3", "s3", "a4", "s4"]
+  ],
+  "crossings": [
+    {"id": "X1", "over_piece": "s1", "under_piece": "s2", "point": [2.0, 0.0]},
+    {"id": "X2", "over_piece": "s2", "under_piece": "s3", "point": [4.0, 2.0]},
+    {"id": "X3", "over_piece": "s3", "under_piece": "s4", "point": [2.0, 4.0]},
+    {"id": "X4", "over_piece": "s4", "under_piece": "s1", "point": [0.0, 2.0]}
+  ]
+}

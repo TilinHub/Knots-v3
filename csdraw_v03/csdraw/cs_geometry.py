@@ -44,11 +44,29 @@ class ArcPiece:
 
 
 @dataclass
+class Crossing:
+    """Cruce declarado manualmente.
+
+    point es solo una marca visual del cruce: no se usa para calcular la longitud
+    ni para construir la componente.
+    """
+
+    id: str
+    over_piece: str
+    under_piece: str
+    point: tuple
+
+
+@dataclass
 class CSRealization:
     """Realizacion geometrica de un diagrama cs.
 
-    Guarda discos, labels, segmentos, arcos y contactos, mas la metadata del
-    diagrama (type, name, components, crossings) cuando esta disponible.
+    Guarda discos, labels, segmentos, arcos y contactos, mas los datos de
+    diagrama de nudo (components, crossings) y la metadata (type, name,
+    knot_label) cuando estan disponibles.
+
+    Las componentes se guardan como el recorrido declarado de piezas cs. No se
+    reconstruyen a partir de los cruces.
     """
 
     disks: Dict[int, Disk]
@@ -56,6 +74,8 @@ class CSRealization:
     segments: Dict[str, SegmentPiece]
     arcs: Dict[str, ArcPiece]
     contacts: List[list] = field(default_factory=list)
+    components: List[list] = field(default_factory=list)
+    crossings: List[Crossing] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
 
     # ---- acceso seguro a los datos ----
@@ -87,6 +107,13 @@ class CSRealization:
         if piece_id in self.arcs:
             return self.arcs[piece_id]
         raise ValueError(f"Unknown piece: {piece_id}")
+
+    def piece_ids(self) -> List[str]:
+        """Lista de ids de pieza: union de segmentos y arcos (segmentos primero).
+
+        Una pieza es un segmento o un arco. No hay una tercera lista de piezas.
+        """
+        return list(self.segments.keys()) + list(self.arcs.keys())
 
     # ---- geometria ----
 
